@@ -15,10 +15,27 @@ b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491  vendor/mysql-b
 SUMS
 
 cd toolkit_tarballs
-cdn=https://global.synologydownload.com/download/ToolChain/toolkit/6.2
-fetch "$cdn/base/base_env-6.2.txz" base_env-6.2.txz
-fetch "$cdn/bromolow/ds.bromolow-6.2.env.txz" ds.bromolow-6.2.env.txz
-fetch "$cdn/bromolow/ds.bromolow-6.2.dev.txz" ds.bromolow-6.2.dev.txz
+fetch_toolkit() {
+    local path=$1 file=${1##*/} host attempt
+    printf 'Downloading Synology toolkit archive %s\n' "$file"
+    for attempt in 1 2 3 4 5 6; do
+        case "$attempt" in
+            1|3|5) host=global.download.synology.com ;;
+            *) host=global.synologydownload.com ;;
+        esac
+        if curl -fLsS --connect-timeout 30 --max-time 600 \
+            --continue-at - --output "$file" \
+            "https://$host/download/ToolChain/toolkit/6.2/$path"; then
+            return 0
+        fi
+        sleep 3
+    done
+    return 1
+}
+
+fetch_toolkit base/base_env-6.2.txz
+fetch_toolkit bromolow/ds.bromolow-6.2.env.txz
+fetch_toolkit bromolow/ds.bromolow-6.2.dev.txz
 md5sum -c <<'SUMS'
 0c109170c524c1e8f31b78f65e9892d1  base_env-6.2.txz
 469f965c7fe00054138b7ee2647b3cbc  ds.bromolow-6.2.env.txz
