@@ -47,8 +47,9 @@ jobs:
               cd /toolkit
               ./pkgscripts-ng/PkgCreate.py -v 6.2 -p bromolow -c MySQL
               mkdir -p /workspace/dist
-              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /workspace/dist/ \\;
-              test -n "$(find /workspace/dist -maxdepth 1 -type f -name "*.spk" -print -quit)"
+              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /workspace/dist/ \;
+              find /workspace/dist -maxdepth 1 -type f -name "*.spk" -print -quit > /tmp/mysql-spk-found
+              test -s /tmp/mysql-spk-found
               sha256sum /workspace/dist/*.spk | tee /workspace/dist/SHA256SUMS
             '
 
