@@ -21,12 +21,12 @@ if ! managed_store; then
         mkdir -m 700 "$directory"
         chown "$account" "$directory"
     done
-    install -m 640 "$target/share/mysql57/my.cnf" "$config"
-    chgrp "$(id -gn "$account")" "$config"
+    cp "$target/share/mysql57/my.cnf" "$config"
+    chmod 600 "$config"
     ln -s "$store/Data" "$data"
     ln -s "$runtime" "$target/Runtime"
     ln -s "$logs" "$target/Logs"
-    launch --initialize
+    launch --initialize || fail "MySQL initialization failed. See $logs/error.log."
 else
     id "$account" >/dev/null || fail "Preserved service account is missing."
     ln -s "$store/Data" "$data"

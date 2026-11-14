@@ -4,7 +4,7 @@
 
 ## 构建与校验
 
-在 Actions 运行 **Build DSM 6.2.3 SPK**。工作流校验下载归档，构建完整服务端与客户端，检查 ELF 依赖与 GLIBC 版本，然后执行初始化、Unix socket SQL、TCP TLS SQL 和重启持久性检查。产物包括 SPK、`SHA256SUMS` 和 `ELF-dependencies.txt`。解压 Actions 产物后运行 `sha256sum -c SHA256SUMS`。
+在 Actions 运行 **Build DSM 6.2.3 SPK**。工作流校验下载归档，构建完整服务端与客户端，检查 ELF 依赖与 GLIBC 版本，然后执行初始化、Unix socket SQL、TCP TLS SQL 和重启持久性检查。CI 另在一次性 Linux runner 上用真实 MySQL 执行套件脚本，验证拒绝覆盖、升级、卸载和重装。DSM 套件中心和开机启动仍需用隔离 DSM 验收。产物包括 SPK、`SHA256SUMS` 和 `ELF-dependencies.txt`。解压 Actions 产物后运行 `sha256sum -c SHA256SUMS`。
 
 ## 安装和使用
 

@@ -32,6 +32,10 @@ def is_elf(file):
 files = [file for file in payload.rglob("*") if is_elf(file)]
 provided = {file.name for file in files}
 for file in files:
+    program = readelf("-lW", file)
+    interpreter = re.search(r"Requesting program interpreter: (.*?)\]", program)
+    if interpreter and interpreter[1] != "/lib64/ld-linux-x86-64.so.2":
+        raise SystemExit(f"{file}: unexpected interpreter {interpreter[1]}")
     dynamic = readelf("-dW", file)
     if "There is no dynamic section" in dynamic:
         continue
@@ -54,4 +58,5 @@ for file in files:
     relative = os.path.relpath(runtime, file.parent)
     package_lib = os.path.relpath(payload / "lib", file.parent)
     paths = f"$ORIGIN:$ORIGIN/{relative}:$ORIGIN/{package_lib}"
+    file.chmod(file.stat().st_mode | 0o200)
     subprocess.run(["patchelf", "--force-rpath", "--set-rpath", paths, file], check=True)

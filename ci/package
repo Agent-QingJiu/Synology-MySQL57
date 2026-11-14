@@ -17,6 +17,10 @@ test ! -e "$payload/Data"
 mkdir -p "$payload/lib/runtime" "$payload/share/mysql57" "$dist"
 install -m 644 conf/my.cnf "$payload/share/mysql57/my.cnf"
 python3 ci/elf "$payload" "$sysroot" | tee "$dist/ELF-dependencies.txt"
+loader=$sysroot/lib/ld-linux-x86-64.so.2
+for tool in mysqld mysql mysqladmin mysqldump; do
+    "$loader" --library-path "$sysroot/lib:$sysroot/usr/lib" "$payload/bin/$tool" --no-defaults --version | grep -F "5.7.44"
+done
 bash ci/smoke "$payload"
 
 mkdir -p "$spk/conf" "$spk/scripts"
@@ -31,6 +35,7 @@ tar --owner=0 --group=0 -czf "$spk/package.tgz" -C "$payload" .
 artifact="MySQL-${version}-DSM6.2.3-bromolow.spk"
 tar --owner=0 --group=0 -cf "$dist/$artifact" -C "$spk" INFO LICENSE PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG conf scripts package.tgz
 tar -tf "$dist/$artifact"
+sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" bash ci/lifecycle "$dist/$artifact"
 cd "$dist"
 sha256sum "$artifact" > SHA256SUMS
 sha256sum -c SHA256SUMS

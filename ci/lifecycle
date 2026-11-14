@@ -1,0 +1,101 @@
+#!/bin/bash
+# Exercise installed hooks in the disposable GitHub-hosted runner.
+# The synouser shim substitutes only account creation, which is specific to DSM.
+set -euo pipefail
+[[ $EUID = 0 && ${GITHUB_ACTIONS:-} = true ]]
+artifact=$1
+base=/volume1
+target=$base/@appstore/MySQL
+store=$base/@appdata/MySQL57-native
+hooks=$(mktemp -d)
+shim=/usr/syno/sbin/synouser
+test ! -e "$base"
+test ! -e /usr/syno
+! id mysql57spk >/dev/null 2>&1
+cleanup() {
+    status=$?
+    if [ "$status" -ne 0 ] && [ -f "$store/Logs/error.log" ]; then
+        tail -100 "$store/Logs/error.log" | sed -E 's/(temporary password is generated.*: ).*/\1[redacted]/' >&2
+    fi
+    "$hooks/scripts/start-stop-status" stop 2>/dev/null || true
+    rm -rf "$hooks" "$base" /usr/syno
+    if id mysql57spk >/dev/null 2>&1; then userdel mysql57spk; fi
+}
+trap cleanup EXIT
+
+mkdir -p "$target/Data" "$(dirname "$shim")"
+cat > "$shim" <<'SHIM'
+#!/bin/sh
+set -eu
+[ "$1" = --add ]
+exec useradd -M -s /usr/sbin/nologin "$2"
+SHIM
+chmod 755 "$shim"
+tar -xf "$artifact" -C "$hooks"
+export SYNOPKG_PKGDEST=$target
+
+printf 'existing production bytes\n' > "$target/Data/guard"
+if "$hooks/scripts/preinst"; then
+    echo 'preinst unexpectedly accepted existing data' >&2
+    exit 1
+fi
+grep -qx 'existing production bytes' "$target/Data/guard"
+rm "$target/Data/guard"
+rmdir "$target/Data" "$target"
+
+install_payload() {
+    mkdir -p "$target"
+    tar -xzf "$hooks/package.tgz" -C "$target"
+}
+mysql() {
+    "$target/bin/mysql" --no-defaults --socket="$target/Runtime/mysql.sock" -uroot "$@"
+}
+check_row() {
+    test "$(mysql -Nse 'SELECT value FROM lifecycle.probe')" = 25426
+}
+run=$hooks/scripts/start-stop-status
+"$hooks/scripts/preinst"
+install_payload
+"$hooks/scripts/postinst"
+test "$(readlink "$target/Data")" = "$store/Data"
+test "$(stat -c '%a' "$store/Data")" = 700
+test "$(stat -c '%a' "$store/my.cnf")" = 600
+"$run" start
+temporary=$(sed -n 's/.*A temporary password is generated for root@localhost: //p' "$store/Logs/error.log" | tail -1)
+test -n "$temporary"
+MYSQL_PWD="$temporary" mysql --connect-expired-password \
+    -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'isolated-lifecycle-57';"
+export MYSQL_PWD=isolated-lifecycle-57
+mysql -e 'CREATE DATABASE lifecycle; CREATE TABLE lifecycle.probe (value INT); INSERT INTO lifecycle.probe VALUES (25426);'
+"$run" restart
+check_row
+
+export SYNOPKG_PKG_STATUS=UPGRADE
+"$hooks/scripts/preupgrade"
+"$hooks/scripts/preuninst"
+rm -rf "$target"
+"$hooks/scripts/postuninst"
+"$hooks/scripts/preinst"
+install_payload
+"$hooks/scripts/postinst"
+"$hooks/scripts/postupgrade"
+"$run" start
+check_row
+
+export SYNOPKG_PKG_STATUS=UNINSTALL
+"$hooks/scripts/preuninst"
+rm -rf "$target"
+"$hooks/scripts/postuninst"
+test -s "$store/Data/lifecycle/probe.frm"
+test -s "$store/my.cnf"
+
+export SYNOPKG_PKG_STATUS=INSTALL
+"$hooks/scripts/preinst"
+install_payload
+"$hooks/scripts/postinst"
+"$run" start
+check_row
+"$run" stop
+status=0
+"$run" status || status=$?
+test "$status" = 3
