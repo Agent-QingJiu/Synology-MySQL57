@@ -6,7 +6,8 @@ toolchain=/usr/local/x86_64-pc-linux-gnu
 prefix=$toolchain/bin/x86_64-pc-linux-gnu-
 sysroot=$toolchain/x86_64-pc-linux-gnu/sys-root
 export CC=${prefix}gcc CXX=${prefix}g++ AR=${prefix}ar RANLIB=${prefix}ranlib
-export CFLAGS='-O2 -march=x86-64' CXXFLAGS="$CFLAGS"
+export CFLAGS='-O2 -march=x86-64'
+export CXXFLAGS="$CFLAGS"
 "$CC" --version
 cmake --version
 bison --version

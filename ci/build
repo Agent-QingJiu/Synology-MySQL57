@@ -15,7 +15,9 @@ root=/toolkit/build_env/ds.bromolow-6.2
 mkdir -p "$root/work" "$root/out" /toolkit/payload
 cp /toolkit/vendor/* /project/ci/compile "$root/work/"
 mount -t proc proc "$root/proc"
+mkdir -p "$root/dev"
 mount --rbind /dev "$root/dev"
+mount --make-rslave "$root/dev"
 trap 'umount -R "$root/dev"; umount "$root/proc"' EXIT
 chroot "$root" /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/root \
     /bin/bash /work/compile "$(nproc)"

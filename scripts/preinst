@@ -1,6 +1,9 @@
 #!/bin/sh
 . "$(dirname "$0")/common"
 check_target
+if [ "${SYNOPKG_PKG_STATUS:-INSTALL}" = UPGRADE ]; then
+    managed_store || fail "Refusing to upgrade an unmanaged MySQL instance."
+fi
 if [ -e "$target" ]; then
     [ -d "$target" ] && [ -z "$(ls -A "$target")" ] ||
         fail "Existing installation at $target. Use an isolated NAS or plan a separate approved migration."
