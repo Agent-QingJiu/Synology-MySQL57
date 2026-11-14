@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+cd /work
+jobs=$1
+toolchain=/usr/local/x86_64-pc-linux-gnu
+prefix=$toolchain/bin/x86_64-pc-linux-gnu-
+sysroot=$toolchain/x86_64-pc-linux-gnu/sys-root
+export CC=${prefix}gcc CXX=${prefix}g++ AR=${prefix}ar RANLIB=${prefix}ranlib
+export CFLAGS='-O2 -march=x86-64' CXXFLAGS="$CFLAGS"
+"$CC" --version
+cmake --version
+bison --version
+unset PKG_CONFIG_PATH
+export PKG_CONFIG_LIBDIR="$sysroot/usr/lib/pkgconfig:$sysroot/usr/share/pkgconfig"
+export PKG_CONFIG_SYSROOT_DIR="$sysroot"
+
+tar xzf openssl-1.1.1w.tar.gz
+ssl=/work/openssl
+(
+    cd openssl-OpenSSL_1_1_1w
+    perl Configure linux-x86_64 no-shared no-dso no-tests -fPIC --prefix="$ssl" --openssldir=/etc/ssl
+    make -j"$jobs" > /work/openssl.log 2>&1 || { tail -150 /work/openssl.log; exit 1; }
+    make install_sw >> /work/openssl.log 2>&1 || { tail -150 /work/openssl.log; exit 1; }
+)
+
+tar xzf mysql-boost-5.7.44.tar.gz
+source_dir=/work/mysql-5.7.44
+mkdir mysql-build
+cd mysql-build
+cmake "$source_dir" \
+    -DCMAKE_INSTALL_PREFIX=/volume1/@appstore/MySQL \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_AR="$AR" -DCMAKE_RANLIB="$RANLIB" \
+    -DCMAKE_FIND_ROOT_PATH="$sysroot" \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DWITH_BOOST="$source_dir/boost" -DDOWNLOAD_BOOST=OFF \
+    -DWITH_SSL="$ssl" \
+    -DOPENSSL_INCLUDE_DIR="$ssl/include" \
+    -DOPENSSL_LIBRARY="$ssl/lib/libssl.a" \
+    -DCRYPTO_LIBRARY="$ssl/lib/libcrypto.a" \
+    -DWITH_ZLIB=bundled -DWITH_EDITLINE=bundled \
+    -DWITH_UNIT_TESTS=OFF -DWITH_EMBEDDED_SERVER=OFF \
+    -DINSTALL_MYSQLTESTDIR= -DENABLE_DTRACE=OFF
+make -j"$jobs"
+make install DESTDIR=/out
+install -m 644 /work/openssl-OpenSSL_1_1_1w/LICENSE /out/volume1/@appstore/MySQL/LICENSE.OpenSSL

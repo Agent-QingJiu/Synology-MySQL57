@@ -1,0 +1,15 @@
+#!/bin/sh
+. "$(dirname "$0")/common"
+check_target
+if [ -e "$target" ]; then
+    [ -d "$target" ] && [ -z "$(ls -A "$target")" ] ||
+        fail "Existing installation at $target. Use an isolated NAS or plan a separate approved migration."
+fi
+if [ -e "$store" ] || [ -L "$store" ]; then
+    managed_store || fail "Existing unmanaged persistent directory: $store"
+    [ -d "$store/Data/mysql" ] && [ ! -L "$store/Data" ] ||
+        fail "Preserved Data requires inspection before reinstall."
+fi
+if port_in_use; then
+    fail "TCP port 3306 is already in use."
+fi

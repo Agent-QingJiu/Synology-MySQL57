@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euo pipefail
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates git python2.7 python3 cifs-utils xz-utils
+git init pkgscripts-ng
+git -C pkgscripts-ng fetch --depth 1 https://github.com/SynologyOpenSource/pkgscripts-ng.git bb837744893f28275beb8842a878cb6d0913d0ac
+git -C pkgscripts-ng checkout --detach FETCH_HEAD
+(
+    cd pkgscripts-ng
+    ./EnvDeploy -v 6.2 -p bromolow -t /toolkit/toolkit_tarballs
+)
+
+root=/toolkit/build_env/ds.bromolow-6.2
+mkdir -p "$root/work" "$root/out" /toolkit/payload
+cp /toolkit/vendor/* /project/ci/compile "$root/work/"
+mount -t proc proc "$root/proc"
+mount --rbind /dev "$root/dev"
+trap 'umount -R "$root/dev"; umount "$root/proc"' EXIT
+chroot "$root" /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/root \
+    /bin/bash /work/compile "$(nproc)"
+test -x "$root/out/volume1/@appstore/MySQL/bin/mysqld"
+cp -a "$root/out/volume1/@appstore/MySQL/." /toolkit/payload/
+chown -R --reference=/toolkit /toolkit/payload

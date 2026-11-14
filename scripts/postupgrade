@@ -1,4 +1,12 @@
 #!/bin/sh
-set -eu
-# Keep existing database files and user configuration untouched during upgrades.
-exit 0
+. "$(dirname "$0")/common"
+check_target
+managed_store || fail "Persistent database storage is missing."
+for name in Data Runtime Logs; do
+    if [ ! -e "$target/$name" ] && [ ! -L "$target/$name" ]; then
+        ln -s "$store/$name" "$target/$name"
+    fi
+    [ "$(readlink "$target/$name")" = "$store/$name" ] ||
+        fail "Unexpected path at $target/$name"
+done
+check_data

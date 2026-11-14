@@ -1,0 +1,56 @@
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+
+payload, sysroot = map(pathlib.Path, sys.argv[1:])
+runtime = payload / "lib/runtime"
+system = {
+    "ld-linux-x86-64.so.2", "libc.so.6", "libpthread.so.0", "librt.so.1",
+    "libdl.so.2", "libm.so.6", "libresolv.so.2", "libcrypt.so.1",
+    "libnsl.so.1", "libutil.so.1",
+}
+search = [sysroot / directory for directory in ("lib", "usr/lib", "lib64", "usr/lib64")]
+sdk_libraries = {file.name: file for directory in reversed(search)
+                 for file in directory.glob("*.so*")}
+for compiler_dir in (sysroot.parent / "lib64", sysroot.parent / "lib",
+                     sysroot.parents[1] / "lib64", sysroot.parents[1] / "lib"):
+    for file in compiler_dir.glob("*.so*"):
+        sdk_libraries.setdefault(file.name, file)
+
+def readelf(option, file):
+    return subprocess.check_output(["readelf", option, file], text=True)
+
+def is_elf(file):
+    if file.is_symlink() or not file.is_file():
+        return False
+    with file.open("rb") as stream:
+        return stream.read(4) == b"\x7fELF"
+
+files = [file for file in payload.rglob("*") if is_elf(file)]
+provided = {file.name for file in files}
+for file in files:
+    dynamic = readelf("-dW", file)
+    if "There is no dynamic section" in dynamic:
+        continue
+    versions = re.findall(r"Name: GLIBC_(\d+(?:\.\d+)+)", readelf("-VW", file))
+    if any(tuple(map(int, version.split("."))) > (2, 20) for version in versions):
+        raise SystemExit(f"{file}: requires GLIBC newer than 2.20: {versions}")
+    needed = re.findall(r"\(NEEDED\).*?\[(.*?)\]", dynamic)
+    print(file.relative_to(payload), "=>", " ".join(needed))
+    for name in needed:
+        if name in system or name in provided:
+            continue
+        library = sdk_libraries.get(name)
+        if library is None or not library.is_file():
+            raise SystemExit(f"{file}: missing target dependency {name}")
+        bundled = runtime / name
+        shutil.copyfile(library, bundled)
+        files.append(bundled)
+        provided.add(name)
+    relative = os.path.relpath(runtime, file.parent)
+    package_lib = os.path.relpath(payload / "lib", file.parent)
+    paths = f"$ORIGIN:$ORIGIN/{relative}:$ORIGIN/{package_lib}"
+    subprocess.run(["patchelf", "--force-rpath", "--set-rpath", paths, file], check=True)

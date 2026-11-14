@@ -1,0 +1,36 @@
+#!/bin/bash
+set -euo pipefail
+toolkit=$1
+dist=$2
+payload=$toolkit/payload
+sdk=$toolkit/build_env/ds.bromolow-6.2
+sysroot=$sdk/usr/local/x86_64-pc-linux-gnu/x86_64-pc-linux-gnu/sys-root
+spk=$(mktemp -d)
+trap 'rm -rf "$spk"' EXIT
+
+test -x "$payload/bin/mysqld"
+test -x "$payload/bin/mysql"
+test -x "$payload/bin/mysqldump"
+test -f "$payload/share/english/errmsg.sys"
+test ! -e "$payload/Data"
+
+mkdir -p "$payload/lib/runtime" "$payload/share/mysql57" "$dist"
+install -m 644 conf/my.cnf "$payload/share/mysql57/my.cnf"
+python3 ci/elf "$payload" "$sysroot" | tee "$dist/ELF-dependencies.txt"
+bash ci/smoke "$payload"
+
+mkdir -p "$spk/conf" "$spk/scripts"
+install -m 644 conf/privilege "$spk/conf/privilege"
+install -m 755 scripts/* "$spk/scripts/"
+sh INFO.sh > "$spk/INFO"
+version=$(sed -n 's/^version="\([^"]*\)"/\1/p' "$spk/INFO")
+printf 'extractsize="%s"\n' "$(du -sk "$payload" | cut -f1)" >> "$spk/INFO"
+python3 ci/icons "$spk"
+cp "$payload/LICENSE" "$spk/LICENSE"
+tar --owner=0 --group=0 -czf "$spk/package.tgz" -C "$payload" .
+artifact="MySQL-${version}-DSM6.2.3-bromolow.spk"
+tar --owner=0 --group=0 -cf "$dist/$artifact" -C "$spk" INFO LICENSE PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG conf scripts package.tgz
+tar -tf "$dist/$artifact"
+cd "$dist"
+sha256sum "$artifact" > SHA256SUMS
+sha256sum -c SHA256SUMS

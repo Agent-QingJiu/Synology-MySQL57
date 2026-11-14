@@ -1,67 +1,37 @@
 #!/bin/sh
-set -eu
-
-PKG_NAME="MySQL"
-PKG_DIR="/var/packages/${PKG_NAME}/target"
-CONF_DIR="/var/packages/${PKG_NAME}/etc"
-MYSQLD="${PKG_DIR}/bin/mysqld"
-MYSQLADMIN="${PKG_DIR}/bin/mysqladmin"
-DATADIR="${PKG_DIR}/Data"
-LOGDIR="${PKG_DIR}/logs"
-PIDFILE="${DATADIR}/mysql.pid"
-SOCKET="${DATADIR}/mysql.sock"
-MYCNF="${CONF_DIR}/my.cnf"
+. "$(dirname "$0")/common"
 
 start() {
-    mkdir -p "$DATADIR" "$LOGDIR" "${PKG_DIR}/tmp"
-    chown -R nobody:nobody "$DATADIR" "$LOGDIR" "${PKG_DIR}/tmp"
-    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-        echo "MySQL is already running"
-        return 0
+    check_target
+    check_data
+    if live_pid; then
+        return
     fi
-    if [ ! -d "${DATADIR}/mysql" ]; then
-        su -s /bin/sh nobody -c "'${MYSQLD}' --defaults-file='${MYCNF}' --initialize"
+    if port_in_use; then
+        fail "TCP port 3306 is already in use."
     fi
-    su -s /bin/sh nobody -c "'${MYSQLD}' --defaults-file='${MYCNF}' --user=nobody --daemonize"
-    sleep 2
-    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-        echo "MySQL started"
-    else
-        echo "MySQL failed to start; inspect ${LOGDIR}/mysql-error.log" >&2
-        return 1
-    fi
+    launch --daemonize
+    live_pid || fail "MySQL failed to start. See $logs/error.log."
 }
 
 stop() {
-    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-        su -s /bin/sh nobody -c "'${MYSQLADMIN}' --defaults-file='${MYCNF}' --protocol=socket --socket='${SOCKET}' shutdown" || true
-        i=0
-        while [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && [ "$i" -lt 30 ]; do
+    if live_pid; then
+        stopping=$pid
+        kill -TERM "$stopping"
+        elapsed=0
+        while live_pid && [ "$pid" = "$stopping" ]; do
+            [ "$elapsed" -lt 180 ] || fail "MySQL is still shutting down."
             sleep 1
-            i=$((i + 1))
+            elapsed=$((elapsed + 1))
         done
-        if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-            echo "MySQL did not stop within 30 seconds" >&2
-            return 1
-        fi
     fi
-    echo "MySQL stopped"
-}
-
-status() {
-    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-        echo "MySQL is running"
-        exit 0
-    fi
-    echo "MySQL is stopped"
-    exit 3
 }
 
 case "${1:-}" in
     start) start ;;
     stop) stop ;;
-    status) status ;;
     restart) stop; start ;;
-    log) tail -n 100 -f "${LOGDIR}/mysql-error.log" ;;
-    *) echo "Usage: $0 {start|stop|status|restart|log}"; exit 1 ;;
+    status) live_pid || exit 3 ;;
+    log) printf '%s\n' "$logs/error.log" ;;
+    *) fail "Usage: $0 {start|stop|restart|status|log}" ;;
 esac

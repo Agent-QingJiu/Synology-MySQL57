@@ -1,0 +1,5 @@
+#!/bin/sh
+. "$(dirname "$0")/common"
+check_target
+check_data
+"$(dirname "$0")/start-stop-status" stop

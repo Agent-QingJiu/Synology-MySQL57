@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+mkdir -p "$1/vendor" "$1/toolkit_tarballs"
+cd "$1"
+
+fetch() {
+    curl -fLsS --retry 5 --retry-all-errors --connect-timeout 30 --max-time 300 "$1" -o "$2"
+}
+
+fetch https://cdn.mysql.com/archives/mysql-5.7/mysql-boost-5.7.44.tar.gz vendor/mysql-boost-5.7.44.tar.gz
+fetch https://codeload.github.com/openssl/openssl/tar.gz/refs/tags/OpenSSL_1_1_1w vendor/openssl-1.1.1w.tar.gz
+sha256sum -c <<'SUMS'
+b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491  vendor/mysql-boost-5.7.44.tar.gz
+2130e8c2fb3b79d1086186f78e59e8bc8d1a6aedf17ab3907f4cb9ae20918c41  vendor/openssl-1.1.1w.tar.gz
+SUMS
+
+cd toolkit_tarballs
+cdn=https://global.synologydownload.com/download/ToolChain/toolkit/6.2
+fetch "$cdn/base/base_env-6.2.txz" base_env-6.2.txz
+fetch "$cdn/bromolow/ds.bromolow-6.2.env.txz" ds.bromolow-6.2.env.txz
+fetch "$cdn/bromolow/ds.bromolow-6.2.dev.txz" ds.bromolow-6.2.dev.txz
+md5sum -c <<'SUMS'
+0c109170c524c1e8f31b78f65e9892d1  base_env-6.2.txz
+469f965c7fe00054138b7ee2647b3cbc  ds.bromolow-6.2.env.txz
+d56efa99fa8e5141adc990b7f716df5e  ds.bromolow-6.2.dev.txz
+SUMS

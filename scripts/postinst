@@ -1,12 +1,36 @@
 #!/bin/sh
-set -eu
-PKG_DIR="/var/packages/MySQL/target"
-CONF_DIR="/var/packages/MySQL/etc"
-PACKAGE_CONF="/var/packages/MySQL/conf/my.cnf"
-mkdir -p "$CONF_DIR" "$PKG_DIR/Data" "$PKG_DIR/logs"
-if [ ! -f "$CONF_DIR/my.cnf" ]; then
-    cp "$PACKAGE_CONF" "$CONF_DIR/my.cnf"
+. "$(dirname "$0")/common"
+check_target
+if [ "${SYNOPKG_PKG_STATUS:-INSTALL}" = UPGRADE ]; then
+    exit 0
 fi
-chown -R nobody:nobody "$PKG_DIR/Data" "$PKG_DIR/logs"
-chmod 750 "$PKG_DIR/Data"
-exit 0
+
+if ! managed_store; then
+    [ ! -e "$store" ] && [ ! -L "$store" ] && [ ! -L /volume1/@appdata ] ||
+        fail "Refusing to change an unmanaged persistent directory."
+    if id "$account" >/dev/null 2>&1; then
+        fail "Service account $account already exists."
+    fi
+    umask 077
+    /usr/syno/sbin/synouser --add "$account" "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
+        'MySQL native package service' 0 '' 0
+    mkdir -p /volume1/@appdata
+    mkdir -m 755 "$store"
+    : > "$marker"
+    for directory in "$store/Data" "$runtime" "$logs"; do
+        mkdir -m 700 "$directory"
+        chown "$account" "$directory"
+    done
+    install -m 640 "$target/share/mysql57/my.cnf" "$config"
+    chgrp "$(id -gn "$account")" "$config"
+    ln -s "$store/Data" "$data"
+    ln -s "$runtime" "$target/Runtime"
+    ln -s "$logs" "$target/Logs"
+    launch --initialize
+else
+    id "$account" >/dev/null || fail "Preserved service account is missing."
+    ln -s "$store/Data" "$data"
+    ln -s "$runtime" "$target/Runtime"
+    ln -s "$logs" "$target/Logs"
+fi
+check_data

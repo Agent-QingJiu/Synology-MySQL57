@@ -4,102 +4,37 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/build.yml'
-      - 'SynoBuildConf/**'
-      - 'scripts/**'
-      - 'conf/**'
-      - 'INFO.sh'
-
-concurrency:
-  group: mysql57-dsm62-bromolow
-  cancel-in-progress: true
+  pull_request:
 
 permissions:
   contents: read
 
+concurrency:
+  group: mysql57-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 150
     steps:
-      - name: Checkout package source
-        uses: actions/checkout@v4
-
-      - name: Build in official Synology DSM 6.2 environment
+      - uses: actions/checkout@v4
+      - name: Fetch and verify upstream sources and Synology toolkit
+        run: bash ci/fetch "$RUNNER_TEMP/toolkit"
+      - name: Compile with the DSM Bromolow toolchain
         run: |
-          mkdir -p "$RUNNER_TEMP/toolkit"
           docker run --privileged --rm \
-            -v "$GITHUB_WORKSPACE:/toolkit/project:ro" \
+            -v "$GITHUB_WORKSPACE:/project:ro" \
             -v "$RUNNER_TEMP/toolkit:/toolkit" \
-            -w /toolkit ubuntu:18.04 bash -lc '
-              set -euo pipefail
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y \
-                ca-certificates git wget curl python python2.7 python-pip \
-                python3 python3-pip python3-setuptools cifs-utils \
-                build-essential cmake bison pkg-config libncurses5-dev \
-                libaio-dev libtirpc-dev rsync xz-utils zip unzip
-
-              git clone --depth 1 --branch DSM6.2.3 \
-                https://github.com/SynologyOpenSource/pkgscripts-ng.git \
-                /toolkit/pkgscripts-ng
-
-              # Keep the project in the writable toolkit volume, not the runner bind mount.
-              mkdir -p /toolkit/source/MySQL/vendor
-              cp -a /toolkit/project/. /toolkit/source/MySQL/
-
-              # Download the official Oracle MySQL source outside the Synology chroot.
-              curl -fL --retry 5 \
-                https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-5.7.44.tar.gz \
-                -o /toolkit/source/MySQL/vendor/mysql-5.7.44.tar.gz
-              test -s /toolkit/source/MySQL/vendor/mysql-5.7.44.tar.gz
-
-              mkdir -p /toolkit/toolkit_tarballs
-              cd /toolkit/toolkit_tarballs
-              curl -fL --retry 5 \
-                https://global.synologydownload.com/download/ToolChain/toolkit/6.2/base/base_env-6.2.txz \
-                -o base_env-6.2.txz
-              curl -fL --retry 5 \
-                https://global.synologydownload.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.env.txz \
-                -o ds.bromolow-6.2.env.txz
-              curl -fL --retry 5 \
-                https://global.synologydownload.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.dev.txz \
-                -o ds.bromolow-6.2.dev.txz
-
-              echo "0c109170c524c1e8f31b78f65e9892d1  base_env-6.2.txz" | md5sum -c -
-              echo "469f965c7fe00054138b7ee2647b3cbc  ds.bromolow-6.2.env.txz" | md5sum -c -
-              echo "d56efa99fa8e5141adc990b7f716df5e  ds.bromolow-6.2.dev.txz" | md5sum -c -
-
-              cd /toolkit/pkgscripts-ng
-              ./EnvDeploy -v 6.2 -p bromolow -t /toolkit/toolkit_tarballs
-
-              cd /toolkit
-              set +e
-              ./pkgscripts-ng/PkgCreate.py -v 6.2 -p bromolow -c MySQL
-              BUILD_STATUS=$?
-              set -e
-              echo "===== Synology package build logs ====="
-              if [ -f /toolkit/build_env/ds.bromolow-6.2/logs.build ]; then
-                cat /toolkit/build_env/ds.bromolow-6.2/logs.build
-              fi
-              if [ "$BUILD_STATUS" -ne 0 ]; then
-                exit "$BUILD_STATUS"
-              fi
-
-              mkdir -p /toolkit/dist
-              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /toolkit/dist/ \;
-              find /toolkit/dist -maxdepth 1 -type f -name "*.spk" -print -quit > /tmp/mysql-spk-found
-              test -s /tmp/mysql-spk-found
-              sha256sum /toolkit/dist/*.spk | tee /toolkit/dist/SHA256SUMS
-            '
-
-          mkdir -p dist
-          cp -a "$RUNNER_TEMP/toolkit/dist/." dist/
-
-      - name: Upload SPK artifact
-        uses: actions/upload-artifact@v4
+            -w /toolkit ubuntu:18.04 bash /project/ci/build
+      - name: Build and verify the SPK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          bash ci/package "$RUNNER_TEMP/toolkit" "$GITHUB_WORKSPACE/dist"
+      - uses: actions/upload-artifact@v4
         with:
           name: MySQL-5.7.44-DSM6.2.3-bromolow
           path: dist/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90

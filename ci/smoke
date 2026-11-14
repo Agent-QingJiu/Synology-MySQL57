@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+payload=$1
+testdir=$(mktemp -d)
+socket=$testdir/mysql.sock
+port=13306
+mysql="$payload/bin/mysql"
+admin="$payload/bin/mysqladmin"
+server="$payload/bin/mysqld"
+cleanup() {
+    status=$?
+    "$admin" --no-defaults -uroot --socket="$socket" shutdown >/dev/null 2>&1 || true
+    if [ "$status" -ne 0 ] && [ -f "$testdir/error.log" ]; then
+        tail -100 "$testdir/error.log" >&2
+    fi
+    rm -rf "$testdir"
+}
+trap cleanup EXIT
+options=(--no-defaults --user="$(id -un)" --basedir="$payload" --datadir="$testdir/data"
+         --socket="$socket" --pid-file="$testdir/mysql.pid" --log-error="$testdir/error.log"
+         --port="$port" --bind-address=0.0.0.0)
+
+"$server" --no-defaults --version | grep -F '5.7.44'
+"$server" "${options[@]}" --initialize-insecure
+"$server" "${options[@]}" --daemonize
+"$mysql" --no-defaults -uroot --socket="$socket" <<'SQL'
+CREATE DATABASE ci;
+CREATE TABLE ci.probe (value INT);
+INSERT INTO ci.probe VALUES (57);
+CREATE USER 'ci_client'@'%' IDENTIFIED BY 'isolated-ci-57' REQUIRE SSL;
+GRANT SELECT ON ci.* TO 'ci_client'@'%';
+SQL
+remote=$(hostname -I | awk '{print $1}')
+test -n "$remote"
+export MYSQL_PWD=isolated-ci-57
+test "$("$mysql" --no-defaults -h "$remote" -P "$port" -uci_client --ssl-mode=REQUIRED -Nse 'SELECT value FROM ci.probe')" = 57
+unset MYSQL_PWD
+"$admin" --no-defaults -uroot --socket="$socket" shutdown
+"$server" "${options[@]}" --daemonize
+test "$("$mysql" --no-defaults -uroot --socket="$socket" -Nse 'SELECT value FROM ci.probe')" = 57
+"$admin" --no-defaults -uroot --socket="$socket" shutdown

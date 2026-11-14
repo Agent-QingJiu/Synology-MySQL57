@@ -1,7 +1,5 @@
 #!/bin/sh
-set -eu
-# Stop the server before removal or upgrade. Never delete database files here.
-if [ -x /var/packages/MySQL/scripts/start-stop-status ]; then
-    /var/packages/MySQL/scripts/start-stop-status stop || exit 1
-fi
-exit 0
+. "$(dirname "$0")/common"
+check_target
+check_data
+"$(dirname "$0")/start-stop-status" stop

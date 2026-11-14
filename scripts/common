@@ -1,0 +1,63 @@
+#!/bin/sh
+set -eu
+
+target=/volume1/@appstore/MySQL
+store=/volume1/@appdata/MySQL57-native
+data=$target/Data
+config=$store/my.cnf
+runtime=$store/Runtime
+logs=$store/Logs
+account=mysql57spk
+mysqld=$target/bin/mysqld
+pidfile=$runtime/mysql.pid
+socket=$runtime/mysql.sock
+marker=$store/.managed-mysql57
+
+fail() {
+    printf '%s\n' "$*" >&2
+    if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+        printf '%s\n' "$*" >> "$SYNOPKG_TEMP_LOGFILE"
+    fi
+    exit 1
+}
+
+check_target() {
+    [ "${SYNOPKG_PKGDEST:-$target}" = "$target" ] ||
+        fail "Select volume1. This package requires $target."
+    [ ! -L "$target" ] || fail "Package target is a symlink."
+}
+
+managed_store() {
+    [ ! -L /volume1/@appdata ] && [ ! -L "$store" ] &&
+    [ -f "$marker" ] && [ ! -L "$marker" ] &&
+    [ "$(stat -c '%u:%a' "$store")" = 0:755 ] &&
+    [ "$(stat -c '%u:%a' "$marker")" = 0:600 ]
+}
+
+check_data() {
+    managed_store && [ -L "$data" ] &&
+    [ "$(readlink "$data")" = "$store/Data" ] &&
+    [ -d "$store/Data/mysql" ] && [ ! -L "$store/Data" ] &&
+    [ ! -L "$store/Data/mysql" ] && [ -f "$store/Data/auto.cnf" ] ||
+        fail "Managed and initialized Data directory required."
+}
+
+port_in_use() {
+    awk '$2 ~ /:0CEA$/ && $4 == "0A" {found=1} END {exit !found}' \
+        /proc/net/tcp /proc/net/tcp6 2>/dev/null
+}
+
+live_pid() {
+    [ -f "$pidfile" ] && [ ! -L "$pidfile" ] || return 1
+    IFS= read -r pid < "$pidfile" || return 1
+    case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
+    [ "$(readlink "/proc/$pid/exe" 2>/dev/null)" = "$mysqld" ] &&
+    [ "$(awk '/^Uid:/ {print $3}' "/proc/$pid/status" 2>/dev/null)" = "$(id -u "$account")" ]
+}
+
+launch() {
+    "$mysqld" --defaults-file="$config" --user="$account" \
+        --basedir="$target" --datadir="$data" --port=3306 --skip-networking=OFF \
+        --socket="$socket" --pid-file="$pidfile" --log-error="$logs/error.log" \
+        --slow-query-log-file="$logs/slow.log" --general-log-file="$logs/general.log" "$@"
+}
