@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+# Keep existing database files and user configuration untouched during upgrades.
+exit 0
