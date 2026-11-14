@@ -39,7 +39,7 @@ jobs:
                 python3 python3-pip python3-setuptools cifs-utils \
                 build-essential cmake bison pkg-config libncurses5-dev \
                 libaio-dev libtirpc-dev rsync xz-utils zip unzip
-              git clone --depth 1 https://github.com/SynologyOpenSource/pkgscripts-ng.git /toolkit/pkgscripts-ng
+              git clone --depth 1 --branch DSM6.2.3 https://github.com/SynologyOpenSource/pkgscripts-ng.git /toolkit/pkgscripts-ng
               chmod +x /toolkit/pkgscripts-ng/EnvDeploy /toolkit/pkgscripts-ng/PkgCreate.py
               /toolkit/pkgscripts-ng/EnvDeploy -v 6.2 -p bromolow
               mkdir -p /toolkit/source
