@@ -48,6 +48,7 @@ for file in files:
             raise SystemExit(f"{file}: missing target dependency {name}")
         bundled = runtime / name
         shutil.copyfile(library, bundled)
+        bundled.chmod(0o755)
         files.append(bundled)
         provided.add(name)
     relative = os.path.relpath(runtime, file.parent)
