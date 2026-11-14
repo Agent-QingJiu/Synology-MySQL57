@@ -29,9 +29,9 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/toolkit"
           docker run --privileged --rm \
-            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$GITHUB_WORKSPACE:/toolkit/project:ro" \
             -v "$RUNNER_TEMP/toolkit:/toolkit" \
-            -w /workspace ubuntu:18.04 bash -lc '
+            -w /toolkit ubuntu:18.04 bash -lc '
               set -euo pipefail
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -44,16 +44,16 @@ jobs:
                 https://github.com/SynologyOpenSource/pkgscripts-ng.git \
                 /toolkit/pkgscripts-ng
 
-              # Download Oracle's official MySQL source while the outer build
-              # container has a valid CA trust store; the Synology chroot does not.
-              mkdir -p /workspace/vendor
+              # Keep the project in the writable toolkit volume, not the runner bind mount.
+              mkdir -p /toolkit/source/MySQL/vendor
+              cp -a /toolkit/project/. /toolkit/source/MySQL/
+
+              # Download the official Oracle MySQL source outside the Synology chroot.
               curl -fL --retry 5 \
                 https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-5.7.44.tar.gz \
-                -o /workspace/vendor/mysql-5.7.44.tar.gz
-              test -s /workspace/vendor/mysql-5.7.44.tar.gz
+                -o /toolkit/source/MySQL/vendor/mysql-5.7.44.tar.gz
+              test -s /toolkit/source/MySQL/vendor/mysql-5.7.44.tar.gz
 
-              # Synology moved its DSM 6.2 toolchain archives to its own archive CDN.
-              # Download the three official Bromolow/DSM 6.2 toolchain files directly.
               mkdir -p /toolkit/toolkit_tarballs
               cd /toolkit/toolkit_tarballs
               curl -fL --retry 5 \
@@ -73,32 +73,28 @@ jobs:
               cd /toolkit/pkgscripts-ng
               ./EnvDeploy -v 6.2 -p bromolow -t /toolkit/toolkit_tarballs
 
-              mkdir -p /toolkit/source
-              rm -rf /toolkit/source/MySQL
-              cp -a /workspace /toolkit/source/MySQL
               cd /toolkit
               set +e
               ./pkgscripts-ng/PkgCreate.py -v 6.2 -p bromolow -c MySQL
               BUILD_STATUS=$?
               set -e
               echo "===== Synology package build logs ====="
-              find /toolkit/build_env -type f \( -name "logs.build" -o -name "logs.install" \) -print
               if [ -f /toolkit/build_env/ds.bromolow-6.2/logs.build ]; then
                 cat /toolkit/build_env/ds.bromolow-6.2/logs.build
-              fi
-              if [ -f /toolkit/build_env/ds.bromolow-6.2/logs.install ]; then
-                cat /toolkit/build_env/ds.bromolow-6.2/logs.install
               fi
               if [ "$BUILD_STATUS" -ne 0 ]; then
                 exit "$BUILD_STATUS"
               fi
 
-              mkdir -p /workspace/dist
-              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /workspace/dist/ \\;
-              find /workspace/dist -maxdepth 1 -type f -name "*.spk" -print -quit > /tmp/mysql-spk-found
+              mkdir -p /toolkit/dist
+              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /toolkit/dist/ \;
+              find /toolkit/dist -maxdepth 1 -type f -name "*.spk" -print -quit > /tmp/mysql-spk-found
               test -s /tmp/mysql-spk-found
-              sha256sum /workspace/dist/*.spk | tee /workspace/dist/SHA256SUMS
+              sha256sum /toolkit/dist/*.spk | tee /toolkit/dist/SHA256SUMS
             '
+
+          mkdir -p dist
+          cp -a "$RUNNER_TEMP/toolkit/dist/." dist/
 
       - name: Upload SPK artifact
         uses: actions/upload-artifact@v4
