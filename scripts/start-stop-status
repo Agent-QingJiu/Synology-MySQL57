@@ -1,0 +1,67 @@
+#!/bin/sh
+set -eu
+
+PKG_NAME="MySQL"
+PKG_DIR="/var/packages/\${PKG_NAME}/target"
+CONF_DIR="/var/packages/\${PKG_NAME}/etc"
+MYSQLD="\${PKG_DIR}/bin/mysqld"
+MYSQLADMIN="\${PKG_DIR}/bin/mysqladmin"
+DATADIR="\${PKG_DIR}/Data"
+LOGDIR="\${PKG_DIR}/logs"
+PIDFILE="\${PKG_DIR}/mysql.pid"
+SOCKET="\${PKG_DIR}/mysql.sock"
+MYCNF="\${CONF_DIR}/my.cnf"
+
+start() {
+    mkdir -p "$DATADIR" "$LOGDIR" "\${PKG_DIR}/tmp"
+    chown -R nobody:nobody "$DATADIR" "$LOGDIR" "\${PKG_DIR}/tmp"
+    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "MySQL is already running"
+        return 0
+    fi
+    if [ ! -d "\${DATADIR}/mysql" ]; then
+        su -s /bin/sh nobody -c "'\${MYSQLD}' --defaults-file='\${MYCNF}' --initialize"
+    fi
+    su -s /bin/sh nobody -c "'\${MYSQLD}' --defaults-file='\${MYCNF}' --user=nobody --daemonize"
+    sleep 2
+    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "MySQL started"
+    else
+        echo "MySQL failed to start; inspect \${LOGDIR}/mysql-error.log" >&2
+        return 1
+    fi
+}
+
+stop() {
+    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        su -s /bin/sh nobody -c "'\${MYSQLADMIN}' --defaults-file='\${MYCNF}' --protocol=socket --socket='\${SOCKET}' shutdown" || true
+        i=0
+        while [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && [ "$i" -lt 30 ]; do
+            sleep 1
+            i=$((i + 1))
+        done
+        if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+            echo "MySQL did not stop within 30 seconds" >&2
+            return 1
+        fi
+    fi
+    echo "MySQL stopped"
+}
+
+status() {
+    if [ -s "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "MySQL is running"
+        exit 0
+    fi
+    echo "MySQL is stopped"
+    exit 3
+}
+
+case "\${1:-}" in
+    start) start ;;
+    stop) stop ;;
+    status) status ;;
+    restart) stop; start ;;
+    log) tail -n 100 -f "\${LOGDIR}/mysql-error.log" ;;
+    *) echo "Usage: $0 {start|stop|status|restart|log}"; exit 1 ;;
+esac
