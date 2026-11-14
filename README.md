@@ -11,9 +11,42 @@
 在符合目标规格的测试 DSM 上，打开套件中心 → 手动安装，选择 SPK，安装卷选择 **volume1**。DSM 6 的套件信任设置须允许安装此未签署套件。安装完成后用套件中心启动，DSM 管理已启用套件的开机启动。
 
 - 主目录为 `/volume1/@appstore/MySQL`，数据访问路径为 `/volume1/@appstore/MySQL/Data`，端口固定为 `3306`。
-- 第一次安装运行 `mysqld --initialize`。临时 MySQL 管理员密码位于 `/volume1/@appstore/MySQL/Logs/error.log`。以系统管理员读取该日志，在本机用 `bin/mysql --no-defaults --socket=/volume1/@appstore/MySQL/Runtime/mysql.sock -uroot -p --connect-expired-password` 登录并修改 MySQL root 密码。
-- 配置文件为 `/volume1/@appdata/MySQL57-native/my.cnf`。编辑后在套件中心重启套件。监听地址默认为 `127.0.0.1`。开启远程连接时把 `bind-address` 改成 NAS 的局域网地址，创建限定客户端 IP 的 MySQL 账号，设置对应权限及 `REQUIRE SSL`，并在 DSM 防火墙中允许该客户端访问 TCP 3306。
+- 配置文件为 `/volume1/@appdata/MySQL57-native/my.cnf`。编辑后在套件中心重启套件。默认监听 `127.0.0.1:3306`，支持通过 SSH 隧道访问。局域网直连需要另设监听地址、客户端账号和防火墙规则。
 - 错误、慢查询和通用日志分别位于 `Logs/error.log`、`Logs/slow.log`、`Logs/general.log`，均相对于主目录。慢查询及通用日志可在配置文件中开启。轮换日志时保留文件权限，并通过具有 `RELOAD` 权限的本机账号执行 `FLUSH LOGS` 让服务重新打开日志。
+
+### 初始账号与密码
+
+首次安装会初始化数据库，创建 `root@localhost`，并随机生成一次性临时密码。在群晖 SSH 里查看日志，取 `root@localhost:` 后的密码。
+
+```sh
+sudo grep -F 'A temporary password is generated for root@localhost:' \
+  /volume1/@appstore/MySQL/Logs/error.log | tail -n 1
+```
+
+使用临时密码登录，在 `mysql>` 提示符内修改密码。
+
+```sh
+sudo /volume1/@appstore/MySQL/bin/mysql --no-defaults \
+  --socket=/volume1/@appstore/MySQL/Runtime/mysql.sock \
+  -uroot -p --connect-expired-password
+```
+
+```sql
+ALTER USER 'root'@'localhost' IDENTIFIED BY '换成你的新密码';
+```
+
+重装时若复用了原数据库，则继续使用原账号和密码。
+
+### Navicat 用 root 通过 SSH 隧道连接
+
+套件默认启用 `skip-name-resolve`。本机 Unix socket 使用 `root@localhost`。Navicat 经 SSH 隧道使用 TCP，MySQL 看到的来源是 `127.0.0.1`。遇到 `1130 - Host '127.0.0.1' is not allowed`，在本机 `mysql>` 里添加仅限 IPv4 回环连接的管理员账号。
+
+```sql
+CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY '换成你要在 Navicat 用的密码';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+```
+
+在 Navicat 的「SSH」页填写群晖地址和 SSH 账户。「常规」页主机填 `127.0.0.1`，端口 `3306`，用户名 `root`，密码用上面为 TCP 账号设置的密码。若主机栏的 `localhost` 解析到 `127.0.0.1`，也可以继续用。授权立即生效，无需重启 MySQL 或执行 `FLUSH PRIVILEGES`。
 
 ## 持久数据和生命周期
 
@@ -24,3 +57,5 @@
 ## DSM 验收
 
 使用与生产 NAS 隔离的 DSM 6.2.3-25426 Bromolow 实例和空白 volume1。先检查套件中心安装和首次启动、修改临时密码、本地 SQL 与另一台测试主机的 TCP/TLS SQL。创建测试表后依次验证停止、启动、重启 DSM、升级至更高套件修订号、卸载和重装，每次读取相同数据。卸载后检查真实数据目录仍在，重装后检查原账号和配置仍生效。在另一份隔离快照中建立同路径的非本套件文件，确认安装失败且文件散列一致。
+
+套件图标使用 [Devicon 的 MySQL 海豚图形](https://github.com/devicons/devicon/blob/master/icons/mysql/mysql-original.svg)。本套件由 Agent-QingJiu 维护。

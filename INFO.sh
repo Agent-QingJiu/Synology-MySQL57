@@ -1,7 +1,7 @@
 #!/bin/sh
 cat <<'INFO'
 package="MySQL"
-version="5.7.44-0003"
+version="5.7.44-0004"
 displayname="MySQL 5.7.44"
 arch="bromolow"
 description="Oracle MySQL Community Server 5.7.44 for DSM 6.2.3 Bromolow"

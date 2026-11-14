@@ -29,7 +29,7 @@ install -m 755 scripts/* "$spk/scripts/"
 sh INFO.sh > "$spk/INFO"
 version=$(sed -n 's/^version="\([^"]*\)"/\1/p' "$spk/INFO")
 printf 'extractsize="%s"\n' "$(du -skL "$payload" | cut -f1)" >> "$spk/INFO"
-python3 ci/icons "$spk"
+install -m 644 assets/PACKAGE_ICON.PNG assets/PACKAGE_ICON_256.PNG "$spk/"
 cp "$payload/LICENSE" "$spk/LICENSE"
 tar --owner=0 --group=0 -czf "$spk/package.tgz" -C "$payload" .
 artifact="MySQL-${version}-DSM6.2.3-bromolow.spk"
