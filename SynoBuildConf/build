@@ -2,21 +2,22 @@
 set -euo pipefail
 
 MYSQL_VERSION="5.7.44"
-SOURCE_ARCHIVE="$PWD/build/mysql-${MYSQL_VERSION}.tar.gz"
-SOURCE_DIR="$PWD/build/mysql-${MYSQL_VERSION}"
-BUILD_DIR="$PWD/build/mysql-build"
-STAGE_DIR="$PWD/build/mysql-stage"
-PACKAGE_ROOT="$PWD/build/package-root"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE_ARCHIVE="$PROJECT_DIR/vendor/mysql-${MYSQL_VERSION}.tar.gz"
+SOURCE_DIR="$PROJECT_DIR/build/mysql-${MYSQL_VERSION}"
+BUILD_DIR="$PROJECT_DIR/build/mysql-build"
+STAGE_DIR="$PROJECT_DIR/build/mysql-stage"
+PACKAGE_ROOT="$PROJECT_DIR/build/package-root"
 
-mkdir -p "$PWD/build"
-if [ ! -f "$SOURCE_ARCHIVE" ]; then
-    curl -fL --retry 3 \
-      "https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-${MYSQL_VERSION}.tar.gz" \
-      -o "$SOURCE_ARCHIVE"
+if [ ! -s "$SOURCE_ARCHIVE" ]; then
+    echo "[ERROR] Missing vendored official MySQL source: $SOURCE_ARCHIVE" >&2
+    echo "[ERROR] The GitHub Actions workflow must download it before Synology package build." >&2
+    exit 1
 fi
 
+mkdir -p "$PROJECT_DIR/build"
 rm -rf "$SOURCE_DIR" "$BUILD_DIR" "$STAGE_DIR" "$PACKAGE_ROOT"
-tar -xzf "$SOURCE_ARCHIVE" -C "$PWD/build"
+tar -xzf "$SOURCE_ARCHIVE" -C "$PROJECT_DIR/build"
 mkdir -p "$BUILD_DIR" "$STAGE_DIR" "$PACKAGE_ROOT"
 
 cd "$BUILD_DIR"
