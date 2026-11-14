@@ -1,0 +1,67 @@
+name: Build DSM 6.2.3 SPK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/**'
+      - 'SynoBuildConf/**'
+      - 'scripts/**'
+      - 'conf/**'
+      - 'INFO.sh'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:18.04
+    steps:
+      - name: Install build host dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            ca-certificates git wget curl python python2.7 python-pip \
+            python3 python3-pip python3-setuptools cifs-utils \
+            build-essential cmake bison pkg-config libncurses5-dev \
+            libaio-dev libtirpc-dev rsync xz-utils zip unzip
+
+      - name: Checkout package source
+        uses: actions/checkout@v4
+
+      - name: Get Synology package toolkit
+        run: |
+          git clone --depth 1 https://github.com/SynologyOpenSource/pkgscripts-ng.git /toolkit/pkgscripts-ng
+          chmod +x /toolkit/pkgscripts-ng/EnvDeploy
+          chmod +x /toolkit/pkgscripts-ng/PkgCreate.py
+
+      - name: Deploy DSM 6.2 Bromolow build environment
+        run: |
+          cd /toolkit
+          ./pkgscripts-ng/EnvDeploy -v 6.2 -p bromolow
+
+      - name: Build MySQL 5.7.44 and create SPK
+        run: |
+          mkdir -p /toolkit/source
+          cp -a "$GITHUB_WORKSPACE" /toolkit/source/MySQL
+          cd /toolkit
+          ./pkgscripts-ng/PkgCreate.py -v 6.2 -p bromolow -c MySQL
+
+      - name: Collect SPK
+        run: |
+          mkdir -p dist
+          find /toolkit/result_spk -type f -name '*.spk' -exec cp -v {} dist/ \;
+          test -n "$(find dist -maxdepth 1 -type f -name '*.spk' -print -quit)"
+          sha256sum dist/*.spk | tee dist/SHA256SUMS
+
+      - name: Upload SPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MySQL-5.7.44-DSM6.2.3-bromolow
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
