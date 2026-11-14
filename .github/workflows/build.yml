@@ -44,6 +44,14 @@ jobs:
                 https://github.com/SynologyOpenSource/pkgscripts-ng.git \
                 /toolkit/pkgscripts-ng
 
+              # Download Oracle's official MySQL source while the outer build
+              # container has a valid CA trust store; the Synology chroot does not.
+              mkdir -p /workspace/vendor
+              curl -fL --retry 5 \
+                https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-5.7.44.tar.gz \
+                -o /workspace/vendor/mysql-5.7.44.tar.gz
+              test -s /workspace/vendor/mysql-5.7.44.tar.gz
+
               # Synology moved its DSM 6.2 toolchain archives to its own archive CDN.
               # Download the three official Bromolow/DSM 6.2 toolchain files directly.
               mkdir -p /toolkit/toolkit_tarballs
