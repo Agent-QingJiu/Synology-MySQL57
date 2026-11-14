@@ -25,29 +25,54 @@ jobs:
       - name: Checkout package source
         uses: actions/checkout@v4
 
-      - name: Build in DSM 6.2-compatible Ubuntu environment
+      - name: Build in official Synology DSM 6.2 environment
         run: |
           mkdir -p "$RUNNER_TEMP/toolkit"
           docker run --privileged --rm \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$RUNNER_TEMP/toolkit:/toolkit" \
             -w /workspace ubuntu:18.04 bash -lc '
-              set -e
+              set -euo pipefail
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y \
                 ca-certificates git wget curl python python2.7 python-pip \
                 python3 python3-pip python3-setuptools cifs-utils \
                 build-essential cmake bison pkg-config libncurses5-dev \
                 libaio-dev libtirpc-dev rsync xz-utils zip unzip
-              git clone --depth 1 --branch DSM6.2.3 https://github.com/SynologyOpenSource/pkgscripts-ng.git /toolkit/pkgscripts-ng
-              chmod +x /toolkit/pkgscripts-ng/EnvDeploy /toolkit/pkgscripts-ng/PkgCreate.py
-              /toolkit/pkgscripts-ng/EnvDeploy -v 6.2 -p bromolow
+
+              git clone --depth 1 --branch DSM6.2.3 \
+                https://github.com/SynologyOpenSource/pkgscripts-ng.git \
+                /toolkit/pkgscripts-ng
+
+              # Synology moved its DSM 6.2 toolchain archives to its own archive CDN.
+              # Download the three official Bromolow/DSM 6.2 toolchain files directly.
+              mkdir -p /toolkit/toolkit_tarballs
+              cd /toolkit/toolkit_tarballs
+              curl -fL --retry 5 --retry-all-errors \
+                https://global.synologydownload.com/download/ToolChain/toolkit/6.2/base/base_env-6.2.txz \
+                -o base_env-6.2.txz
+              curl -fL --retry 5 --retry-all-errors \
+                https://global.synologydownload.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.env.txz \
+                -o ds.bromolow-6.2.env.txz
+              curl -fL --retry 5 --retry-all-errors \
+                https://global.synologydownload.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.dev.txz \
+                -o ds.bromolow-6.2.dev.txz
+
+              echo "0c109170c524c1e8f31b78f65e9892d1  base_env-6.2.txz" | md5sum -c -
+              echo "469f965c7fe00054138b7ee2647b3cbc  ds.bromolow-6.2.env.txz" | md5sum -c -
+              echo "d56efa99fa8e5141adc990b7f716df5e  ds.bromolow-6.2.dev.txz" | md5sum -c -
+
+              cd /toolkit/pkgscripts-ng
+              ./EnvDeploy -v 6.2 -p bromolow -t /toolkit/toolkit_tarballs
+
               mkdir -p /toolkit/source
+              rm -rf /toolkit/source/MySQL
               cp -a /workspace /toolkit/source/MySQL
               cd /toolkit
               ./pkgscripts-ng/PkgCreate.py -v 6.2 -p bromolow -c MySQL
+
               mkdir -p /workspace/dist
-              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /workspace/dist/ \;
+              find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /workspace/dist/ \\;
               find /workspace/dist -maxdepth 1 -type f -name "*.spk" -print -quit > /tmp/mysql-spk-found
               test -s /tmp/mysql-spk-found
               sha256sum /workspace/dist/*.spk | tee /workspace/dist/SHA256SUMS
