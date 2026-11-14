@@ -48,13 +48,13 @@ jobs:
               # Download the three official Bromolow/DSM 6.2 toolchain files directly.
               mkdir -p /toolkit/toolkit_tarballs
               cd /toolkit/toolkit_tarballs
-              curl -fL --retry 5 --retry-all-errors \
+              curl -fL --retry 5 \
                 https://global.synologydownload.com/download/ToolChain/toolkit/6.2/base/base_env-6.2.txz \
                 -o base_env-6.2.txz
-              curl -fL --retry 5 --retry-all-errors \
+              curl -fL --retry 5 \
                 https://global.synologydownload.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.env.txz \
                 -o ds.bromolow-6.2.env.txz
-              curl -fL --retry 5 --retry-all-errors \
+              curl -fL --retry 5 \
                 https://global.synologydownload.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.dev.txz \
                 -o ds.bromolow-6.2.dev.txz
 
