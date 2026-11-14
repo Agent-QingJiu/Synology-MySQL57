@@ -28,7 +28,7 @@ install -m 644 conf/privilege "$spk/conf/privilege"
 install -m 755 scripts/* "$spk/scripts/"
 sh INFO.sh > "$spk/INFO"
 version=$(sed -n 's/^version="\([^"]*\)"/\1/p' "$spk/INFO")
-printf 'extractsize="%s"\n' "$(du -sk "$payload" | cut -f1)" >> "$spk/INFO"
+printf 'extractsize="%s"\n' "$(du -skL "$payload" | cut -f1)" >> "$spk/INFO"
 python3 ci/icons "$spk"
 cp "$payload/LICENSE" "$spk/LICENSE"
 tar --owner=0 --group=0 -czf "$spk/package.tgz" -C "$payload" .

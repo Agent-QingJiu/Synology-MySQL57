@@ -14,7 +14,7 @@ if ! managed_store; then
     umask 077
     /usr/syno/sbin/synouser --add "$account" "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
         'MySQL native package service' 0 '' 0
-    mkdir -p /volume1/@appdata
+    mkdir -p -m 755 /volume1/@appdata
     mkdir -m 755 "$store"
     : > "$marker"
     for directory in "$store/Data" "$runtime" "$logs"; do
