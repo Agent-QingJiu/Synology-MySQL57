@@ -69,7 +69,21 @@ jobs:
               rm -rf /toolkit/source/MySQL
               cp -a /workspace /toolkit/source/MySQL
               cd /toolkit
+              set +e
               ./pkgscripts-ng/PkgCreate.py -v 6.2 -p bromolow -c MySQL
+              BUILD_STATUS=$?
+              set -e
+              echo "===== Synology package build logs ====="
+              find /toolkit/build_env -type f \( -name "logs.build" -o -name "logs.install" \) -print
+              if [ -f /toolkit/build_env/ds.bromolow-6.2/logs.build ]; then
+                cat /toolkit/build_env/ds.bromolow-6.2/logs.build
+              fi
+              if [ -f /toolkit/build_env/ds.bromolow-6.2/logs.install ]; then
+                cat /toolkit/build_env/ds.bromolow-6.2/logs.install
+              fi
+              if [ "$BUILD_STATUS" -ne 0 ]; then
+                exit "$BUILD_STATUS"
+              fi
 
               mkdir -p /workspace/dist
               find /toolkit/result_spk -type f -name "*.spk" -exec cp -v {} /workspace/dist/ \\;
