@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+
+PKG_DIR="/tmp/_mysql_spk"
+INNER_DIR="/tmp/_mysql_package"
+rm -rf "$PKG_DIR" "$INNER_DIR"
+mkdir -p "$PKG_DIR/scripts" "$PKG_DIR/conf" "$INNER_DIR"
+
+source /pkgscripts-ng/include/pkg_util.sh
+
+test -x build/package-root/bin/mysqld
+cp -a build/package-root/. "$INNER_DIR/"
+cp -a scripts/. "$PKG_DIR/scripts/"
+cp -a conf/. "$PKG_DIR/conf/"
+chmod 755 "$PKG_DIR/scripts/"*
+
+pkg_make_package "$INNER_DIR" "$PKG_DIR"
+./INFO.sh > "$PKG_DIR/INFO"
+mkdir -p /image/packages
+pkg_make_spk "$PKG_DIR" "/image/packages" "$(pkg_get_spk_name)"
