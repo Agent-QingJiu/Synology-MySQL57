@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+PKG_DIR="/var/packages/MySQL/target"
+CONF_DIR="/var/packages/MySQL/etc"
+mkdir -p "$CONF_DIR" "$PKG_DIR/Data" "$PKG_DIR/logs"
+if [ ! -f "$CONF_DIR/my.cnf" ]; then
+    cp "$PKG_DIR/conf/my.cnf" "$CONF_DIR/my.cnf"
+fi
+chown -R nobody:nobody "$PKG_DIR/Data" "$PKG_DIR/logs"
+chmod 750 "$PKG_DIR/Data"
+exit 0
