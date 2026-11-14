@@ -1,0 +1,4 @@
+#!/bin/sh
+# Deliberately do not delete database files. DSM target-directory removal behavior
+# must be validated before promising preservation of Data across uninstall.
+exit 0
