@@ -2,8 +2,8 @@
 set -euo pipefail
 
 MYSQL_VERSION="5.7.44"
-SOURCE_ARCHIVE="$PWD/build/mysql-\${MYSQL_VERSION}.tar.gz"
-SOURCE_DIR="$PWD/build/mysql-\${MYSQL_VERSION}"
+SOURCE_ARCHIVE="$PWD/build/mysql-${MYSQL_VERSION}.tar.gz"
+SOURCE_DIR="$PWD/build/mysql-${MYSQL_VERSION}"
 BUILD_DIR="$PWD/build/mysql-build"
 STAGE_DIR="$PWD/build/mysql-stage"
 PACKAGE_ROOT="$PWD/build/package-root"
@@ -11,7 +11,7 @@ PACKAGE_ROOT="$PWD/build/package-root"
 mkdir -p "$PWD/build"
 if [ ! -f "$SOURCE_ARCHIVE" ]; then
     curl -fL --retry 3 \
-      "https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-\${MYSQL_VERSION}.tar.gz" \
+      "https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-${MYSQL_VERSION}.tar.gz" \
       -o "$SOURCE_ARCHIVE"
 fi
 
@@ -27,7 +27,6 @@ cmake "$SOURCE_DIR" \
   -DDOWNLOAD_BOOST=1 \
   -DWITH_SSL=bundled \
   -DWITH_ZLIB=system \
-  -DWITH_EDITLINE=system \
   -DWITH_UNIT_TESTS=OFF \
   -DWITH_INNODB_MEMCACHED=OFF \
   -DWITH_ARCHIVE_STORAGE_ENGINE=OFF \
