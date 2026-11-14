@@ -1,1 +1,1 @@
-{"defaults":{"run-as":"root"}}
+{"defaults":{"run-as":"root"},"username":"mysql57pkg","groupname":"mysql57pkg"}
