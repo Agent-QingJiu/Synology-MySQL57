@@ -4,7 +4,7 @@
 
 ## 下载与更新
 
-从 [GitHub Releases 最新版本](https://github.com/Agent-QingJiu/Synology-MySQL57/releases/latest) 下载 `.spk` 和 `SHA256SUMS`。无需解压即可在 DSM 套件中心手动安装 SPK。已安装旧版时，可从同一入口覆盖升级。
+从 [GitHub Releases 最新版本](https://github.com/QiStore/Synology-MySQL57/releases/latest) 下载 `.spk` 和 `SHA256SUMS`。无需解压即可在 DSM 套件中心手动安装 SPK。已安装旧版时，可从同一入口覆盖升级。
 
 ### 5.7.44-0006 更新内容
 
@@ -77,4 +77,4 @@ GitHub Actions 已测试升级保留数据、默认卸载保留数据、重装�
 
 使用与生产 NAS 隔离的 DSM 6.2.3-25426 Bromolow 实例和空白 volume1。先检查套件中心安装和首次启动、修改临时密码、本地 SQL 与另一台测试主机的 TCP/TLS SQL。创建测试表后依次验证停止、启动、重启 DSM、升级至更高套件修订号、卸载和重装，每次读取相同数据。卸载后检查真实数据目录仍在，重装后检查原账号和配置仍生效。在另一份隔离快照中建立同路径的非本套件文件，确认安装失败且文件散列一致。
 
-套件图标使用 [Devicon 的 MySQL 海豚图形](https://github.com/devicons/devicon/blob/master/icons/mysql/mysql-original.svg)。本套件由 Agent-QingJiu 维护。
+套件图标使用 [Devicon 的 MySQL 海豚图形](https://github.com/devicons/devicon/blob/master/icons/mysql/mysql-original.svg)。本套件由 QiStore 维护。
