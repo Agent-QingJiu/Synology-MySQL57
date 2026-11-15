@@ -31,9 +31,10 @@ version=$(sed -n 's/^version="\([^"]*\)"/\1/p' "$spk/INFO")
 printf 'extractsize="%s"\n' "$(du -skL "$payload" | cut -f1)" >> "$spk/INFO"
 install -m 644 assets/PACKAGE_ICON.PNG assets/PACKAGE_ICON_256.PNG "$spk/"
 cp "$payload/LICENSE" "$spk/LICENSE"
+cp -a WIZARD_UIFILES "$spk/"
 tar --owner=0 --group=0 -czf "$spk/package.tgz" -C "$payload" .
 artifact="MySQL-${version}-DSM6.2.3-bromolow.spk"
-tar --owner=0 --group=0 -cf "$dist/$artifact" -C "$spk" INFO LICENSE PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG conf scripts package.tgz
+tar --owner=0 --group=0 -cf "$dist/$artifact" -C "$spk" INFO LICENSE PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG conf scripts WIZARD_UIFILES package.tgz
 tar -tf "$dist/$artifact"
 sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" bash ci/lifecycle "$dist/$artifact"
 cd "$dist"

@@ -1,3 +1,23 @@
 #!/bin/sh
-# DSM removes the package target. The persistent store and service account are retained.
-exit 0
+. "$(dirname "$0")/common"
+
+if [ "${SYNOPKG_PKG_STATUS:-}" != UNINSTALL ] ||
+   [ "${wizard_mysql57_purge:-false}" != true ]; then
+    exit 0
+fi
+
+check_target
+managed_store && [ -d "$store/Data" ] && [ ! -L "$store/Data" ] ||
+    fail "Refusing to delete an unmanaged MySQL store."
+if live_pid; then
+    fail "MySQL is still running."
+fi
+if uid=$(id -u "$account" 2>/dev/null); then
+    [ "$uid" != 0 ] && [ "$(stat -c '%u' "$store/Data")" = "$uid" ] ||
+        fail "Service account does not own the MySQL data directory."
+fi
+
+rm -rf -- "$store"
+if [ -n "$uid" ]; then
+    /usr/syno/sbin/synouser --del "$account"
+fi

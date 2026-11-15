@@ -1,6 +1,6 @@
 #!/bin/bash
 # Exercise installed hooks in the disposable GitHub-hosted runner.
-# The synouser shim substitutes only account creation, which is specific to DSM.
+# The synouser shim substitutes only account management, which is specific to DSM.
 set -euo pipefail
 [[ $EUID = 0 && ${GITHUB_ACTIONS:-} = true ]]
 artifact=$1
@@ -27,8 +27,11 @@ mkdir -p "$target/Data" "$(dirname "$shim")"
 cat > "$shim" <<'SHIM'
 #!/bin/sh
 set -eu
-[ "$1" = --add ]
-exec useradd -M -s /usr/sbin/nologin "$2"
+case "$1" in
+    --add) exec useradd -M -s /usr/sbin/nologin "$2" ;;
+    --del) exec userdel "$2" ;;
+    *) exit 1 ;;
+esac
 SHIM
 chmod 755 "$shim"
 tar -xf "$artifact" -C "$hooks"
@@ -71,6 +74,7 @@ mysql -e 'CREATE DATABASE lifecycle; CREATE TABLE lifecycle.probe (value INT); I
 check_row
 
 export SYNOPKG_PKG_STATUS=UPGRADE
+export wizard_mysql57_purge=true
 "$hooks/scripts/preupgrade"
 "$hooks/scripts/preuninst"
 rm -rf "$target"
@@ -83,6 +87,7 @@ install_payload
 check_row
 
 export SYNOPKG_PKG_STATUS=UNINSTALL
+unset wizard_mysql57_purge
 "$hooks/scripts/preuninst"
 rm -rf "$target"
 "$hooks/scripts/postuninst"
@@ -99,3 +104,16 @@ check_row
 status=0
 "$run" status || status=$?
 test "$status" = 3
+
+jq -e '.[0].items[0].subitems[0] |
+    .key == "wizard_mysql57_purge" and .defaultValue == false' \
+    "$hooks/WIZARD_UIFILES/uninstall_uifile"
+export SYNOPKG_PKG_STATUS=UNINSTALL wizard_mysql57_purge=true
+"$hooks/scripts/preuninst"
+rm -rf "$target"
+"$hooks/scripts/postuninst"
+test ! -e "$store"
+if id mysql57spk >/dev/null 2>&1; then
+    echo 'Service account unexpectedly retained after purge' >&2
+    exit 1
+fi

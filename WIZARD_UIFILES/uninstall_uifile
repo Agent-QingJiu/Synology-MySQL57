@@ -1,0 +1,18 @@
+[
+  {
+    "step_title": "MySQL 卸载",
+    "items": [
+      {
+        "type": "multiselect",
+        "desc": "默认保留数据，供重装后继续使用。勾选后会永久删除本套件的全部数据库和表。",
+        "subitems": [
+          {
+            "key": "wizard_mysql57_purge",
+            "desc": "同时删除所有数据库、配置、日志和服务账号",
+            "defaultValue": false
+          }
+        ]
+      }
+    ]
+  }
+]
