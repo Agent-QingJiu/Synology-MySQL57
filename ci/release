@@ -1,0 +1,45 @@
+#!/bin/bash
+set -euo pipefail
+
+version=$(sh INFO.sh | sed -n 's/^version="\([^"]*\)"$/\1/p')
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]
+tag="v$version"
+spk="MySQL-$version-DSM6.2.3-bromolow.spk"
+(
+    cd dist
+    sha256sum -c SHA256SUMS
+    test -s "$spk"
+    test -s ELF-dependencies.txt
+)
+digest=$(sha256sum "dist/$spk" | cut -d ' ' -f1)
+notes=$(mktemp)
+trap 'rm -f "$notes"' EXIT
+cat > "$notes" <<NOTES
+## 下载与安装
+
+- 下载 **$spk**，在 DSM「套件中心 → 手动安装」中选择该文件。已安装旧版时可从同一入口覆盖升级。
+- 适用平台为 DSM 6.2.3-25426、Bromolow（x86_64）。
+- SHA256 校验值为 \`$digest\`。可下载 \`SHA256SUMS\` 核对。
+
+## 版本说明
+
+NOTES
+cat release-notes.md >> "$notes"
+printf '\n安装、登录和卸载说明见 [README](%s/%s/blob/%s/README.md)。\n' \
+    "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> "$notes"
+
+assets=("dist/$spk" dist/SHA256SUMS dist/ELF-dependencies.txt)
+if release=$(gh release view "$tag" --json isDraft,targetCommitish,assets); then
+    if jq -e '.isDraft == false' <<<"$release" >/dev/null; then
+        jq -e --arg spk "$spk" \
+            '([.assets[].name] | contains([$spk, "SHA256SUMS", "ELF-dependencies.txt"]))' \
+            <<<"$release" >/dev/null
+        exit 0
+    fi
+    jq -e --arg sha "$GITHUB_SHA" '.targetCommitish == $sha' <<<"$release" >/dev/null
+    gh release upload "$tag" "${assets[@]}" --clobber
+else
+    gh release create "$tag" "${assets[@]}" --draft --target "$GITHUB_SHA" \
+        --title "MySQL $version 群晖原生套件" --notes-file "$notes"
+fi
+gh release edit "$tag" --draft=false --latest

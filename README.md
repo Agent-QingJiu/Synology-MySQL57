@@ -2,17 +2,19 @@
 
 面向 DS3615xs / Bromolow（x86_64）的 DSM 6.2 原生套件，目标版本为 DSM 6.2.3-25426。GitHub Actions 在 Synology 官方 DSM 6.2 Bromolow 工具链中编译 Oracle MySQL Community Server 5.7.44，配套 OpenSSL 1.1.1w 随源码构建。NAS 上由套件中心管理系统服务。套件 ID 为 `MySQL`。
 
-## 下载 5.7.44-0005
+## 下载与更新
 
-[下载 DSM 6.2.3 Bromolow SPK 和 SHA256SUMS](https://github.com/Agent-QingJiu/Synology-MySQL57/actions/runs/43689700460/artifacts/14152930271) · [GitHub Actions 构建记录](https://github.com/Agent-QingJiu/Synology-MySQL57/actions/runs/43689700460)
+从 [GitHub Releases 最新版本](https://github.com/Agent-QingJiu/Synology-MySQL57/releases/latest) 下载 `.spk` 和 `SHA256SUMS`。无需解压即可在 DSM 套件中心手动安装 SPK。已安装旧版时，可从同一入口覆盖升级。
 
-解压后，在套件中心选择 `MySQL-5.7.44-0005-DSM6.2.3-bromolow.spk`。已安装旧版时，可用同一入口覆盖升级。
+### 5.7.44-0006 更新内容
 
-SPK 的 SHA256 为 `ce4325ef7772401067937f5b3add79da43a5ba5a5e558445785a5202066f91a6`。
+- 套件中心的 MySQL 描述改为简体中文。
+- GitHub Actions 在构建和测试通过后自动发布 SPK、SHA256 校验文件和依赖清单，方便直接下载。
+- 套件中心卸载时默认保留数据。勾选彻底清理后，会永久删除本套件的数据库、配置、日志和 DSM 服务账号。
 
 ## 构建与校验
 
-在 Actions 运行 **Build DSM 6.2.3 SPK**。工作流校验下载归档，构建完整服务端与客户端，检查 ELF 依赖与 GLIBC 版本，然后执行初始化、Unix socket SQL、TCP TLS SQL 和重启持久性检查。CI 另在一次性 Linux runner 上用真实 MySQL 执行套件脚本，验证拒绝覆盖、升级、卸载和重装。DSM 套件中心和开机启动仍需用隔离 DSM 验收。产物包括 SPK、`SHA256SUMS` 和 `ELF-dependencies.txt`。解压 Actions 产物后运行 `sha256sum -c SHA256SUMS`。
+在 Actions 运行 **Build DSM 6.2.3 SPK**。工作流校验下载归档，构建完整服务端与客户端，检查 ELF 依赖与 GLIBC 版本，然后执行初始化、Unix socket SQL、TCP TLS SQL 和重启持久性检查。CI 另在一次性 Linux runner 上用真实 MySQL 执行套件脚本，验证拒绝覆盖、升级、卸载和重装。DSM 套件中心和开机启动仍需用隔离 DSM 验收。产物包括 SPK、`SHA256SUMS` 和 `ELF-dependencies.txt`。从 Releases 下载 SPK 和校验文件后，在同一目录运行 `sha256sum -c SHA256SUMS`。主分支构建与验证通过后，工作流按套件版本自动发布 Release。
 
 ## 安装和使用
 
